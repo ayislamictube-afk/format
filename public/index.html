@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ফাইল আপলোড</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--ac:#2563eb;--bd:#d9dde3}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--tx:#e8eaed;--mut:#9aa0a8;--ac:#4f8cff;--bd:#2c313a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,sans-serif;padding:16px}
+.w{max-width:640px;margin:0 auto}h1{font-size:22px}
+.drop{border:2px dashed var(--bd);background:var(--card);border-radius:14px;padding:36px 16px;text-align:center;cursor:pointer}
+.drop.on{border-color:var(--ac)}.drop small{color:var(--mut)}
+input[type=password]{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);margin-bottom:12px}
+.item{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-top:10px;word-break:break-all}
+.item a{color:var(--ac)}.row{display:flex;gap:8px;margin-top:8px}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px}
+.err{color:#dc2626}
+</style>
+</head>
+<body><div class="w">
+<h1>📤 ফাইল আপলোড করে লিংক নিন</h1>
+<input type="password" id="pw" placeholder="পাসওয়ার্ড" style="display:none">
+<div class="drop" id="drop">ফাইল এখানে ছাড়ুন বা ট্যাপ করুন<br><small id="lim"></small>
+<input type="file" id="f" multiple hidden></div>
+<div id="out"></div>
+<div class="item" style="margin-top:24px"><b>🔗 আপনার মূল লিংক (সব জায়গায় ব্যবহার করুন)</b><br>
+<a id="base" target="_blank"></a><div class="row"><button id="cb">কপি</button></div>
+<small style="color:var(--mut)">ব্যবহার:</small>
+<pre id="ex" style="white-space:pre-wrap;font-size:12px;margin:6px 0 0"></pre></div>
+</div>
+<script>
+const $=id=>document.getElementById(id),drop=$('drop'),out=$('out'),pw=$('pw');
+fetch('/config').then(r=>r.json()).then(c=>{
+ const b=c.base;$('base').href=b;$('base').textContent=b;
+ $('cb').onclick=e=>{navigator.clipboard.writeText(b);e.target.textContent='কপি হয়েছে ✓'};
+ $('ex').textContent='আপলোড API:  POST '+b+'/upload  (field: files)\nটার্মিনাল:   curl -T photo.png '+b+'/upload/photo.png\nফাইল লিংক:  '+b+'/f/<id>/<ফাইলের নাম>\nHTML এ:      <img src="'+b+'/f/<id>/photo.png">\nযেকোনো সাইট, অ্যাপ বা বট থেকে কাজ করবে।';
+$('lim').textContent='সর্বোচ্চ '+c.maxMB+'MB';
+ if(c.needPassword){pw.style.display='block';pw.value=localStorage.getItem('pw')||''}});
+drop.onclick=()=>$('f').click();
+$('f').onchange=e=>send(e.target.files);
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('on')};
+drop.ondragleave=()=>drop.classList.remove('on');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('on');send(e.dataTransfer.files)};
+async function send(files){
+ if(!files.length)return;
+ const fd=new FormData();for(const f of files)fd.append('files',f);
+ const box=document.createElement('div');box.className='item';box.textContent='আপলোড হচ্ছে...';out.prepend(box);
+ try{
+  localStorage.setItem('pw',pw.value);
+  const r=await fetch('/upload',{method:'POST',body:fd,headers:{'x-password':pw.value}});
+  const d=await r.json();
+  if(!d.ok){box.innerHTML='<span class="err">'+d.error+'</span>';return}
+  box.remove();
+  d.files.forEach(f=>{
+   const el=document.createElement('div');el.className='item';
+   el.innerHTML='<b></b><br><a target="_blank"></a><div class="row"><button>কপি</button></div>';
+   el.querySelector('b').textContent=f.name;
+   const a=el.querySelector('a');a.href=f.url;a.textContent=f.url;
+   el.querySelector('button').onclick=e=>{navigator.clipboard.writeText(f.url);e.target.textContent='কপি হয়েছে ✓'};
+   out.prepend(el);
+  });
+ }catch(e){box.innerHTML='<span class="err">ব্যর্থ: '+e.message+'</span>'}
+}
+</script></body></html>
